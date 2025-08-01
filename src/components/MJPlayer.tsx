@@ -247,13 +247,13 @@ export const MJPlayer = () => {
       <div className="flex flex-col items-center justify-center p-8 space-y-8">
         {/* Vinyl Record */}
         <div className="relative">
-          <div 
-            className={`w-48 h-48 bg-card rounded-full border-8 border-primary flex items-center justify-center ${
+          <img 
+            src="/lovable-uploads/66998a74-a7e0-4bb4-bc94-9e833b61c7b8.png"
+            alt="Vinyl Record"
+            className={`w-48 h-48 rounded-full ${
               playerState.isPlaying ? "vinyl-spinning" : ""
             }`}
-          >
-            <div className="w-16 h-16 bg-background rounded-full border-2 border-primary"></div>
-          </div>
+          />
         </div>
 
         {/* Song Info */}
