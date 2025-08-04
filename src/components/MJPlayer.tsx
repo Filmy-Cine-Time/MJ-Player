@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -22,6 +25,8 @@ interface Song {
   id: string;
   title: string;
   url: string;
+  artist?: string;
+  uploaded_by?: string;
 }
 
 interface PlayerState {
@@ -35,6 +40,8 @@ interface PlayerState {
 }
 
 export const MJPlayer = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMysongsMode, setIsMysongsMode] = useState(true);
   const [mySongs, setMySongs] = useState<Song[]>([]);
@@ -56,21 +63,37 @@ export const MJPlayer = () => {
   const currentPlaylist = isMysongsMode ? mySongs : youtubeSongs;
   const currentSong = currentPlaylist[playerState.currentSongIndex];
 
-  // Load data from localStorage on mount
+  // Load data from Supabase and localStorage on mount
   useEffect(() => {
-    const savedMySongs = localStorage.getItem("mjplayer-mysongs");
     const savedYoutubeSongs = localStorage.getItem("mjplayer-youtube");
     const savedMode = localStorage.getItem("mjplayer-mode");
     
-    if (savedMySongs) setMySongs(JSON.parse(savedMySongs));
     if (savedYoutubeSongs) setYoutubeSongs(JSON.parse(savedYoutubeSongs));
     if (savedMode) setIsMysongsMode(savedMode === "mysongs");
-  }, []);
+    
+    // Load songs from Supabase
+    if (user) {
+      loadSongsFromSupabase();
+    }
+  }, [user]);
 
-  // Save data to localStorage when changed
-  useEffect(() => {
-    localStorage.setItem("mjplayer-mysongs", JSON.stringify(mySongs));
-  }, [mySongs]);
+  // Load songs from Supabase
+  const loadSongsFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("songs")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      if (error) {
+        toast({ title: "Error loading songs", description: error.message, variant: "destructive" });
+      } else {
+        setMySongs(data || []);
+      }
+    } catch (error) {
+      console.error("Error loading songs:", error);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem("mjplayer-youtube", JSON.stringify(youtubeSongs));
@@ -157,20 +180,33 @@ export const MJPlayer = () => {
     setPlayerState(prev => ({ ...prev, currentTime: value[0] }));
   };
 
-  const addMySong = () => {
+  const addMySong = async () => {
     const title = prompt("Song Name:");
     if (!title) return;
     
     const url = prompt("TeraBox Direct Download Link:");
     if (!url) return;
     
-    const newSong: Song = {
-      id: Date.now().toString(),
-      title,
-      url,
-    };
+    const artist = prompt("Artist (optional):") || null;
     
-    setMySongs(prev => [...prev, newSong]);
+    try {
+      const { error } = await supabase.from("songs").insert({
+        title,
+        url,
+        artist,
+        uploaded_by: user?.id,
+      });
+
+      if (error) {
+        toast({ title: "Error adding song", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Success", description: "Song added successfully!" });
+        loadSongsFromSupabase(); // Reload songs
+      }
+    } catch (error) {
+      console.error("Error adding song:", error);
+      toast({ title: "Error", description: "Failed to add song", variant: "destructive" });
+    }
   };
 
   const addYoutubeSong = () => {

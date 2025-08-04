@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/useAuth";
-import { EnhancedMJPlayer } from "@/components/EnhancedMJPlayer";
+import { MJPlayer } from "@/components/MJPlayer";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
@@ -24,7 +24,7 @@ const Index = () => {
     );
   }
 
-  return <EnhancedMJPlayer />;
+  return <MJPlayer />;
 };
 
 export default Index;
