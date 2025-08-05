@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -18,7 +19,10 @@ import {
   Download, 
   Heart, 
   List, 
-  Menu 
+  Menu,
+  Settings,
+  User,
+  LogOut
 } from "lucide-react";
 
 interface Song {
@@ -40,8 +44,9 @@ interface PlayerState {
 }
 
 export const MJPlayer = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMysongsMode, setIsMysongsMode] = useState(true);
   const [mySongs, setMySongs] = useState<Song[]>([]);
@@ -49,6 +54,7 @@ export const MJPlayer = () => {
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   const [playerState, setPlayerState] = useState<PlayerState>({
     isPlaying: false,
@@ -71,11 +77,30 @@ export const MJPlayer = () => {
     if (savedYoutubeSongs) setYoutubeSongs(JSON.parse(savedYoutubeSongs));
     if (savedMode) setIsMysongsMode(savedMode === "mysongs");
     
-    // Load songs from Supabase
+    // Load songs from Supabase and check admin status
     if (user) {
       loadSongsFromSupabase();
+      checkAdminStatus();
     }
   }, [user]);
+
+  // Check if user is admin
+  const checkAdminStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin'
+      });
+      
+      if (!error) {
+        setIsAdmin(data || false);
+      }
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+    }
+  };
 
   // Load songs from Supabase
   const loadSongsFromSupabase = async () => {
@@ -256,24 +281,130 @@ export const MJPlayer = () => {
           </SheetTrigger>
           <SheetContent side="right" className="w-80">
             <div className="space-y-6 pt-6">
-              <div className="flex items-center space-x-2">
-                <Switch 
-                  id="mode-switch" 
-                  checked={!isMysongsMode}
-                  onCheckedChange={(checked) => setIsMysongsMode(!checked)}
-                />
-                <Label htmlFor="mode-switch">
-                  {isMysongsMode ? "My Songs" : "YouTube"}
-                </Label>
-              </div>
-              
-              <Button 
-                onClick={addMySong}
-                className="w-full"
-                variant="outline"
-              >
-                Add My Song (Link)
-              </Button>
+              {user ? (
+                <>
+                  {/* User Info */}
+                  <div className="flex items-center space-x-3 p-3 bg-secondary rounded-lg">
+                    <User className="h-8 w-8 text-primary" />
+                    <div>
+                      <p className="font-semibold">{user.email}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {isAdmin ? "Admin" : "User"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Navigation Options */}
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={() => {
+                        navigate("/dashboard");
+                        setSideMenuOpen(false);
+                      }}
+                      className="w-full justify-start"
+                      variant="ghost"
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      User Dashboard
+                    </Button>
+
+                    {isAdmin && (
+                      <Button 
+                        onClick={() => {
+                          navigate("/admin");
+                          setSideMenuOpen(false);
+                        }}
+                        className="w-full justify-start"
+                        variant="ghost"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Admin Panel
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Player Controls */}
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        id="mode-switch" 
+                        checked={!isMysongsMode}
+                        onCheckedChange={(checked) => setIsMysongsMode(!checked)}
+                      />
+                      <Label htmlFor="mode-switch">
+                        {isMysongsMode ? "My Songs" : "YouTube"}
+                      </Label>
+                    </div>
+                    
+                    <Button 
+                      onClick={addMySong}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      Add My Song (Link)
+                    </Button>
+                  </div>
+
+                  {/* Logout */}
+                  <div className="pt-4 border-t border-border">
+                    <Button 
+                      onClick={() => {
+                        signOut();
+                        setSideMenuOpen(false);
+                      }}
+                      className="w-full justify-start"
+                      variant="ghost"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Not logged in */}
+                  <div className="text-center space-y-4">
+                    <p className="text-muted-foreground">Sign in to access premium features</p>
+                    <Button 
+                      onClick={() => {
+                        navigate("/auth");
+                        setSideMenuOpen(false);
+                      }}
+                      className="w-full"
+                    >
+                      Sign In / Sign Up
+                    </Button>
+                  </div>
+
+                  {/* Basic Player Controls for guests */}
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        id="mode-switch" 
+                        checked={!isMysongsMode}
+                        onCheckedChange={(checked) => setIsMysongsMode(!checked)}
+                      />
+                      <Label htmlFor="mode-switch">
+                        {isMysongsMode ? "My Songs" : "YouTube"}
+                      </Label>
+                    </div>
+                    
+                    <Button 
+                      onClick={() => {
+                        toast({ 
+                          title: "Sign In Required", 
+                          description: "Please sign in to add songs", 
+                          variant: "destructive" 
+                        });
+                      }}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      Add My Song (Sign In Required)
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </SheetContent>
         </Sheet>
